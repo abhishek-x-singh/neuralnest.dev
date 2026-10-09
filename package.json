@@ -1,0 +1,22 @@
+{
+  "name": "neuralnest.dev",
+  "version": "1.0.0",
+  "description": "An open-source AI knowledge platform that lets users upload documents, build their own knowledge bases, and ask questions with answers grounded in their sources.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://localhost:26831/abhishek-x-singh/neuralnest.dev"
+  },
+  "keywords": [
+    "knowledge-management",
+    "semantic-search",
+    "rag",
+    "nlp"
+  ],
+  "author": "",
+  "license": "ISC"
+}

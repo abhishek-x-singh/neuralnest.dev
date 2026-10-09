@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuralNest Knowledge</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 960px; }
+      section { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+      textarea, input, select, button { width: 100%; margin-top: 0.5rem; margin-bottom: 0.5rem; padding: 0.5rem; }
+      button { cursor: pointer; }
+      .sources li { margin-bottom: 0.5rem; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+      @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
+      pre { white-space: pre-wrap; background: #f5f5f5; padding: 0.75rem; border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <h1>NeuralNest Knowledge</h1>
+    <p>Upload text documents, ask natural language questions, and receive source-grounded answers.</p>
+
+    <section>
+      <h2>1) Upload document</h2>
+      <input id="title" placeholder="Document title" />
+      <input id="category" placeholder="Category (optional)" value="General" />
+      <input id="file" type="file" accept=".txt,.md,text/plain" />
+      <textarea id="content" rows="8" placeholder="Paste document content here..."></textarea>
+      <button id="uploadBtn">Upload</button>
+      <pre id="uploadStatus"></pre>
+    </section>
+
+    <section>
+      <h2>2) Ask questions</h2>
+      <textarea id="question" rows="4" placeholder="Ask a question about uploaded documents..."></textarea>
+      <button id="askBtn">Ask</button>
+      <h3>Answer</h3>
+      <pre id="answer"></pre>
+      <h3>Sources</h3>
+      <ul id="sources" class="sources"></ul>
+    </section>
+
+    <section>
+      <h2>3) Summarize / Study tools</h2>
+      <label for="documentSelect">Choose document</label>
+      <select id="documentSelect"></select>
+      <div class="row">
+        <div>
+          <button id="summarizeBtn">Generate summary</button>
+          <pre id="summary"></pre>
+        </div>
+        <div>
+          <button id="studyBtn">Generate flashcards</button>
+          <pre id="study"></pre>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      async function refreshDocuments() {
+        const response = await fetch('/api/documents');
+        const data = await response.json();
+        const select = document.getElementById('documentSelect');
+        select.innerHTML = '';
+
+        for (const doc of data.documents) {
+          const option = document.createElement('option');
+          option.value = doc.id;
+          option.textContent = `${doc.id}: ${doc.title} (${doc.category})`;
+          select.appendChild(option);
+        }
+      }
+
+      document.getElementById('file').addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const text = await file.text();
+        document.getElementById('content').value = text;
+        if (!document.getElementById('title').value) {
+          document.getElementById('title').value = file.name;
+        }
+      });
+
+      document.getElementById('uploadBtn').addEventListener('click', async () => {
+        const payload = {
+          title: document.getElementById('title').value.trim(),
+          category: document.getElementById('category').value.trim() || 'General',
+          content: document.getElementById('content').value.trim(),
+        };
+
+        const response = await fetch('/api/documents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+        document.getElementById('uploadStatus').textContent = JSON.stringify(data, null, 2);
+        if (response.ok) {
+          await refreshDocuments();
+        }
+      });
+
+      document.getElementById('askBtn').addEventListener('click', async () => {
+        const response = await fetch('/api/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: document.getElementById('question').value.trim(), topK: 3 }),
+        });
+
+        const data = await response.json();
+        document.getElementById('answer').textContent = data.answer || data.error || 'No answer.';
+        const list = document.getElementById('sources');
+        list.innerHTML = '';
+
+        for (const source of data.sources || []) {
+          const item = document.createElement('li');
+          item.textContent = `${source.title} [chunk ${source.chunkId}] (score ${source.score}): ${source.excerpt}`;
+          list.appendChild(item);
+        }
+      });
+
+      document.getElementById('summarizeBtn').addEventListener('click', async () => {
+        const id = document.getElementById('documentSelect').value;
+        if (!id) return;
+        const response = await fetch(`/api/documents/${id}/summarize`, { method: 'POST' });
+        const data = await response.json();
+        document.getElementById('summary').textContent = data.summary || data.error;
+      });
+
+      document.getElementById('studyBtn').addEventListener('click', async () => {
+        const id = document.getElementById('documentSelect').value;
+        if (!id) return;
+        const response = await fetch(`/api/documents/${id}/study`, { method: 'POST' });
+        const data = await response.json();
+        document.getElementById('study').textContent = (data.cards || []).map((card) => `${card.question}\n→ ${card.answer}`).join('\n\n') || data.error;
+      });
+
+      refreshDocuments();
+    </script>
+  </body>
+</html>
